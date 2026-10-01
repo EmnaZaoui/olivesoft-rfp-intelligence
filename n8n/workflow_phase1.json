@@ -1,0 +1,236 @@
+{
+  "name": "Phase1 - Tender Intelligence Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "3f857bc1-7ac6-4ffa-bc0f-a7b0a1126acf",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/tenders/ingest/dynamic",
+        "options": {}
+      },
+      "id": "b00bf05c-25f6-449c-828e-b88798f227c4",
+      "name": "1 - Detect Tenders (Serper + Scraping)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "e813f571-4f1f-4ecd-bb6a-c694be6da0df",
+      "name": "2 - Loop Over Tenders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -240,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/extract",
+        "options": {}
+      },
+      "id": "fc564a35-11b5-4596-ae15-113aab15240b",
+      "name": "3 - Extract Tender Fields",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/research",
+        "options": {}
+      },
+      "id": "511d3942-630f-47e9-9eba-e41fa6499790",
+      "name": "4 - Agentic Prospect Research (MCP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        464,
+        0
+      ],
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.tender_id }}/draft",
+        "options": {}
+      },
+      "id": "850476e5-d928-4799-bde7-0f41b60c87c8",
+      "name": "5 - Generate Persuasive Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        688,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8b6bf3d8-2cf7-4770-8730-7c0878363a2f",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "extracted",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        0
+      ],
+      "id": "595f5c6a-7bc4-479a-be2c-7b711744ddea",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        336,
+        240
+      ],
+      "id": "82924575-30a3-4ab8-b652-95cfc6ce1281",
+      "name": "Tender ignoré (extraction échouée)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "1 - Detect Tenders (Serper + Scraping)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1 - Detect Tenders (Serper + Scraping)": {
+      "main": [
+        [
+          {
+            "node": "2 - Loop Over Tenders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2 - Loop Over Tenders": {
+      "main": [
+        [],
+        [
+          {
+            "node": "3 - Extract Tender Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3 - Extract Tender Fields": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4 - Agentic Prospect Research (MCP)": {
+      "main": [
+        [
+          {
+            "node": "5 - Generate Persuasive Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5 - Generate Persuasive Draft": {
+      "main": [
+        [
+          {
+            "node": "2 - Loop Over Tenders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "4 - Agentic Prospect Research (MCP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tender ignoré (extraction échouée)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7e92763e-f6e1-4cf1-a06d-5b1e519e0776",
+  "meta": {
+    "instanceId": "38539b69e0f096d36651c35b65c4dce79a9f864abb4fb76e287ec86bef431296"
+  },
+  "nodeGroups": [],
+  "id": "C3ZKmJCKE3nfGnVU",
+  "tags": []
+}
