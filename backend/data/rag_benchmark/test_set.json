@@ -1,0 +1,102 @@
+[
+  {
+    "query": "expérience en développement backend bancaire et conformité RGPD",
+    "relevant_document_titles": ["CV_Ahmed_Benali.pdf", "Projet_Core_Banking_Banque_Zitouna.pdf"]
+  },
+  {
+    "query": "lead backend developer FastAPI microservices banque",
+    "relevant_document_titles": ["CV_Ahmed_Benali.pdf"]
+  },
+  {
+    "query": "full stack developer React Next.js e-commerce multi-vendeurs",
+    "relevant_document_titles": ["CV_Sara_Gharbi.pdf", "Projet_Ecommerce_Jumia.pdf"]
+  },
+  {
+    "query": "UI UX design Figma Tailwind CSS React Native",
+    "relevant_document_titles": ["CV_Sara_Gharbi.pdf"]
+  },
+  {
+    "query": "data scientist machine learning NLP RAG LLM Ollama pgvector",
+    "relevant_document_titles": ["CV_Mohamed_Trabelsi.pdf", "Projet_RAG_Telnet.pdf"]
+  },
+  {
+    "query": "architecture RAG recherche documentaire embeddings nomic-embed-text",
+    "relevant_document_titles": ["Projet_RAG_Telnet.pdf", "CV_Mohamed_Trabelsi.pdf"]
+  },
+  {
+    "query": "refonte système information bancaire core banking microservices",
+    "relevant_document_titles": ["Projet_Core_Banking_Banque_Zitouna.pdf"]
+  },
+  {
+    "query": "plateforme e-commerce paiement en ligne Stripe D17 multi-vendeurs",
+    "relevant_document_titles": ["Projet_Ecommerce_Jumia.pdf", "CV_Sara_Gharbi.pdf"]
+  },
+  {
+    "query": "data engineer Google Cloud Platform GCP Dataflow BigQuery",
+    "relevant_document_titles": ["CV_Yessin_Zayen.pdf", "Profile (2).pdf"]
+  },
+  {
+    "query": "Talend integration data ETL middleware",
+    "relevant_document_titles": ["Profile (6).pdf", "Profile (4).pdf"]
+  },
+  {
+    "query": "Power BI consultant reporting financier data analyst",
+    "relevant_document_titles": ["CV_Amine_Kobbi.pdf", "Profile (30).pdf"]
+  },
+  {
+    "query": "Salesforce developer Apex LWC CRM",
+    "relevant_document_titles": ["Profile (10).pdf", "Profile (25).pdf"]
+  },
+  {
+    "query": "MuleSoft consultant API REST data integration",
+    "relevant_document_titles": ["Profile (11).pdf", "Profile (13).pdf"]
+  },
+  {
+    "query": "Apache Airflow orchestration data pipelines",
+    "relevant_document_titles": ["Profile (5).pdf", "Profile (12).pdf"]
+  },
+  {
+    "query": "Data Engineer Databricks Spark MLOps MLflow",
+    "relevant_document_titles": ["Profile (22).pdf", "Profile (19).pdf"]
+  },
+  {
+    "query": "génération images vidéo modèles diffusion LoRA marketing",
+    "relevant_document_titles": ["Profile (16).pdf"]
+  },
+  {
+    "query": "agent IA architecture multi-agents LLM MCP protocol",
+    "relevant_document_titles": ["Profile (22).pdf", "Profile (1).pdf"]
+  },
+  {
+    "query": "QA engineer test automation Selenium JUnit Azure DevOps",
+    "relevant_document_titles": ["Profile (31).pdf", "Profile (23).pdf"]
+  },
+  {
+    "query": "Power BI CI/CD Azure DevOps pipelines .pbip Tabular Editor",
+    "relevant_document_titles": ["Profile (20).pdf"]
+  },
+  {
+    "query": "Apache Airflow scheduler DAGs workflows data orchestration",
+    "relevant_document_titles": ["PFE book 2026 olivesoft.pdf", "Profile (5).pdf"]
+  },
+  {
+    "query": "Odoo ERP configuration personnalisation migration BoondManager",
+    "relevant_document_titles": ["PFE book 2026 olivesoft.pdf"]
+  },
+  {
+    "query": "OliveSoft mission clients Retail Luxe transformation digitale",
+    "relevant_document_titles": ["PFE book 2025 olivesoft.pdf", "PFE book 2024 olivesoft.pdf"]
+  },
+  {
+    "query": "expertise OliveSoft data integration data platform artificial intelligence Salesforce",
+    "relevant_document_titles": ["PFE book 2026 olivesoft.pdf", "PFE book 2025 olivesoft.pdf"]
+  },
+  {
+    "query": "projets PFE 2024 Talend Mulesoft reporting",
+    "relevant_document_titles": ["PFE book 2024 olivesoft.pdf", "olivesoft-pfe-2024.pdf"]
+  },
+  {
+    "query": "projets PFE 2025 Data Platform Power BI Salesforce",
+    "relevant_document_titles": ["PFE book 2025 olivesoft.pdf"]
+  }
+]
