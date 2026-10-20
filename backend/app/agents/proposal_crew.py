@@ -125,18 +125,21 @@ def _writer_task_description(context_block: str, feedback: str) -> str:
 
     return f"""{context_block}{feedback_block}
 
-Rédige une proposition commerciale complète en respectant IMPÉRATIVEMENT ces règles:
-1. Pour chaque exigence marquée "Couverte: Oui", cite la preuve concrète fournie (chiffres, durée,
-   nom de projet) pour montrer précisément comment OliveSoft y répond.
-2. Pour les exigences non couvertes, formule-le honnêtement comme un point à approfondir avec le
-   client, jamais comme un échec.
-3. N'écris JAMAIS le mot "unknown". Si une donnée manque, reformule naturellement
-   ("à confirmer avec le client", "point à valider lors du prochain échange").
-4. Ton persuasif, confiant, orienté bénéfices business, jamais générique.
-5. Structure ta réponse en sections Markdown avec EXACTEMENT ces titres, dans cet ordre:
+Rédige une proposition commerciale destinée à être présentée en DIAPOSITIVES. Règles impératives:
+1. Pour chaque exigence "Couverte: Oui", cite la preuve concrète fournie (durée, taille d'équipe,
+   budget, nom de projet/client) pour montrer précisément comment OliveSoft y répond.
+2. Pour les exigences non couvertes, formule-le honnêtement comme un point à approfondir ensemble,
+   jamais comme un échec.
+3. N'écris JAMAIS le mot "unknown". Si une donnée manque, reformule ("à confirmer avec le client").
+4. Format: pour chaque section, 4 à 6 puces courtes commençant par "- ", 25 mots maximum chacune.
+   Pas de longs paragraphes, pas de tableaux Markdown, pas de sous-titres.
+5. Mets en gras avec **...** uniquement quelques chiffres ou noms clés dans les puces, jamais dans les titres.
+6. Chaque section contient au moins un chiffre concret issu des données fournies. N'invente rien.
+7. Ton persuasif, confiant, orienté bénéfices business pour CE client, jamais générique.
+8. Titres de section au format "## Titre", EXACTEMENT ces titres et dans cet ordre:
 {sections_list}
 
-Retourne uniquement le contenu Markdown de la proposition, sans commentaire additionnel.
+Retourne uniquement le contenu Markdown, sans commentaire additionnel.
 """
 
 

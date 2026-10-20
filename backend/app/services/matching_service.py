@@ -95,7 +95,7 @@ def run_matching_and_scoring(db: Session, tender: Tender) -> list[RequirementMat
     db.query(RequirementMatch).filter(RequirementMatch.tender_id == tender.id).delete()
 
     matches = []
-    for requirement in requirements:
+    for requirement in requirements[:10]:
         if not requirement or not requirement.strip():
             continue  # edge case: exigence vide dans la liste extraite
         result = score_requirement(db, requirement)

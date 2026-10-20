@@ -1,0 +1,367 @@
+{
+  "name": "Phase2 - Tender Intelligence Pipeline (multi-sources)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "n-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a-mode",
+              "name": "mode",
+              "value": "opendata",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-mode",
+      "name": "Choix du mode (legacy / apify / opendata)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  {
+                    "id": "c-legacy",
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "legacy",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "legacy"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  {
+                    "id": "c-apify",
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "apify",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "apify"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  {
+                    "id": "c-opendata",
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "opendata",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "opendata"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n-switch",
+      "name": "Switch mode",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/tenders/ingest/dynamic?max_tenders=10",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-ingest-legacy",
+      "name": "1a - Detect (Serper + Playwright)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/tenders/ingest/apify?max_tenders=5&pre_extract=true&source=google",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-ingest-apify",
+      "name": "1b - Detect (Apify)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/tenders/ingest/opendata?max_tenders=10",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-ingest-opendata",
+      "name": "1c - Detect (Banque mondiale)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 520]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "n-loop",
+      "name": "2 - Loop Over Tenders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {},
+      "id": "n-done",
+      "name": "Pipeline terminé",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/extract",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-extract",
+      "name": "3 - Extract Fields",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/qualify",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-qualify",
+      "name": "4 - Qualify (Matching + Scoring)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1600, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "c-qualified",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "qualified",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n-if",
+      "name": "5 - If qualified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1860, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/research",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-research",
+      "name": "6 - Research Prospect (MCP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2120, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.tender_id }}/competitor-insights",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-competitor",
+      "name": "7 - Competitor Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2380, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/proposals/tenders/{{ $json.tender_id }}/generate",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-generate",
+      "name": "8 - Generate Proposal (Crew)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2640, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/exports/proposals/{{ $('8 - Generate Proposal (Crew)').item.json.id }}/pptx",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-pptx",
+      "name": "9 - Export PPTX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2900, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/exports/proposals/{{ $('8 - Generate Proposal (Crew)').item.json.id }}/pdf",
+        "options": { "timeout": 1800000 }
+      },
+      "id": "n-pdf",
+      "name": "10 - Export PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3160, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "n-skip",
+      "name": "Tender ignoré (non qualifié)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2120, 600]
+    },
+    {
+      "parameters": {},
+      "id": "n-next",
+      "name": "Tender suivant",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1600, 760]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Choix du mode (legacy / apify / opendata)", "type": "main", "index": 0 }]]
+    },
+    "Choix du mode (legacy / apify / opendata)": {
+      "main": [[{ "node": "Switch mode", "type": "main", "index": 0 }]]
+    },
+    "Switch mode": {
+      "main": [
+        [{ "node": "1a - Detect (Serper + Playwright)", "type": "main", "index": 0 }],
+        [{ "node": "1b - Detect (Apify)", "type": "main", "index": 0 }],
+        [{ "node": "1c - Detect (Banque mondiale)", "type": "main", "index": 0 }]
+      ]
+    },
+    "1a - Detect (Serper + Playwright)": {
+      "main": [[{ "node": "2 - Loop Over Tenders", "type": "main", "index": 0 }]]
+    },
+    "1b - Detect (Apify)": {
+      "main": [[{ "node": "2 - Loop Over Tenders", "type": "main", "index": 0 }]]
+    },
+    "1c - Detect (Banque mondiale)": {
+      "main": [[{ "node": "2 - Loop Over Tenders", "type": "main", "index": 0 }]]
+    },
+    "2 - Loop Over Tenders": {
+      "main": [
+        [{ "node": "Pipeline terminé", "type": "main", "index": 0 }],
+        [{ "node": "3 - Extract Fields", "type": "main", "index": 0 }]
+      ]
+    },
+    "3 - Extract Fields": {
+      "main": [
+        [{ "node": "4 - Qualify (Matching + Scoring)", "type": "main", "index": 0 }],
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }]
+      ]
+    },
+    "4 - Qualify (Matching + Scoring)": {
+      "main": [
+        [{ "node": "5 - If qualified", "type": "main", "index": 0 }],
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }]
+      ]
+    },
+    "5 - If qualified": {
+      "main": [
+        [{ "node": "6 - Research Prospect (MCP)", "type": "main", "index": 0 }],
+        [{ "node": "Tender ignoré (non qualifié)", "type": "main", "index": 0 }]
+      ]
+    },
+    "6 - Research Prospect (MCP)": {
+      "main": [
+        [{ "node": "7 - Competitor Insights", "type": "main", "index": 0 }],
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }]
+      ]
+    },
+    "7 - Competitor Insights": {
+      "main": [
+        [{ "node": "8 - Generate Proposal (Crew)", "type": "main", "index": 0 }],
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }]
+      ]
+    },
+    "8 - Generate Proposal (Crew)": {
+      "main": [
+        [{ "node": "9 - Export PPTX", "type": "main", "index": 0 }],
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }]
+      ]
+    },
+    "9 - Export PPTX": {
+      "main": [
+        [{ "node": "10 - Export PDF", "type": "main", "index": 0 }],
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }]
+      ]
+    },
+    "10 - Export PDF": {
+      "main": [
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }],
+        [{ "node": "Tender suivant", "type": "main", "index": 0 }]
+      ]
+    },
+    "Tender ignoré (non qualifié)": {
+      "main": [[{ "node": "Tender suivant", "type": "main", "index": 0 }]]
+    },
+    "Tender suivant": {
+      "main": [[{ "node": "2 - Loop Over Tenders", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

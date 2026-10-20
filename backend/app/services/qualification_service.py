@@ -15,15 +15,21 @@ BUDGET_NUMBER_REGEX = re.compile(r"(\d[\d\s.,]{2,})")
 def _parse_budget_value(budget_text: str | None) -> float | None:
     if not budget_text or budget_text.lower() == "unknown":
         return None
-    match = BUDGET_NUMBER_REGEX.search(budget_text.replace(" ", ""))
+    
+    cleaned = budget_text.replace("TND", "").replace("DH", "").replace("EUR", "").replace("€", "").replace("TTC", "").strip()
+    
+    if "," in cleaned and "." in cleaned:
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    elif "," in cleaned and "." not in cleaned:
+        cleaned = cleaned.replace(",", ".")
+    
+    match = re.search(r"(\d+(?:\.\d+)?)", cleaned)
     if not match:
         return None
-    raw = match.group(1).replace(" ", "").replace(",", "")
     try:
-        return float(raw)
+        return float(match.group(1))
     except ValueError:
         return None
-
 
 def _parse_deadline(deadline_text: str | None):
     if not deadline_text or deadline_text.lower() == "unknown":
