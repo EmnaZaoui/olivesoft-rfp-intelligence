@@ -1,96 +1,176 @@
+import logging
+from collections import Counter
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+
 from sqlalchemy.orm import Session
 
 from app.models import Tender
 from app.services.serper_client import search_web
-from app.services.scraper_service import scrape_page_text
+from app.services.scraper_service import scrape_many
 from app.services.extraction_service import extract_tender_fields
-from app.services.content_quality import is_content_sufficient, looks_like_listing_page
+from app.services.search_queries import build_queries
 from app.services.portal_sources import discover_tender_links, discover_links_from_known_portals
+from app.services.content_quality import (
+    is_content_sufficient, looks_like_listing_page, assess_tender_candidate,
+    it_relevance_score, negative_score, content_has_tender_signal,
+)
 
-_seen_urls_this_run = set()
+logger = logging.getLogger(__name__)
 
-DEFAULT_SEARCH_QUERIES = [
-    "\"appel d'offres\" développement logiciel Tunisie cahier des charges 2026",
-    "\"appel d'offres\" plateforme web Tunisie date limite",
-    "RFP software development services deadline 2026",
-    "tender IT digital transformation services budget deadline",
-]
+MAX_CANDIDATES_TO_SCRAPE = 40
+MAX_LISTING_SUBLINKS = 30
+SCRAPE_WORKERS = 4
+PREFERRED_DOMAINS = ("j360.info", "appeloffres.com", "tuneps.tn")
 
-MAX_LISTING_EXPANSION = 5
-
-
-def _create_tender_if_valid(db: Session, url: str, raw_text: str, fallback_snippet: str = "") -> Tender | None:
-    if db.query(Tender).filter(Tender.source_url == url).first():
-        return None  # déjà connu, on évite les doublons
-
-    if not is_content_sufficient(raw_text):
-        if fallback_snippet and len(fallback_snippet) > 80:
-            raw_text = fallback_snippet
-        else:
-            return None  # edge case: rien d'exploitable, on ignore proprement sans casser le pipeline
-
-    tender = Tender(source="dynamic_search", source_url=url, raw_text=raw_text, status="new")
-    db.add(tender)
-    return tender
+_last_stats: dict = {}
 
 
-def _process_url(db: Session, url: str, fallback_snippet: str = "", depth: int = 0) -> list[Tender]:
-    if url in _seen_urls_this_run:
-        return []
-    _seen_urls_this_run.add(url)
-
-    if db.query(Tender).filter(Tender.source_url == url).first():
-        return []
-
-    created = []
-    scraped = scrape_page_text(url)
-
-    if scraped.startswith("SCRAPE_ERROR"):
-        tender = _create_tender_if_valid(db, url, scraped, fallback_snippet)
-        if tender:
-            created.append(tender)
-        return created
-
-    if looks_like_listing_page(scraped) and depth == 0:
-        sub_links = discover_tender_links(url)[:MAX_LISTING_EXPANSION]
-        for sub_url in sub_links:
-            if sub_url in _seen_urls_this_run:
-                continue
-            created.extend(_process_url(db, sub_url, depth=depth + 1))
-        return created
-
-    tender = _create_tender_if_valid(db, url, scraped, fallback_snippet)
-    if tender:
-        created.append(tender)
-    return created
+def get_last_ingestion_stats() -> dict:
+    return _last_stats
 
 
-def ingest_dynamic_tenders(db: Session, queries: list[str] | None = None, results_per_query: int = 4) -> list[Tender]:
-    queries = queries or DEFAULT_SEARCH_QUERIES
-    all_created = []
+def _normalize_url(url: str) -> str:
+    p = urlparse(url.strip())
+    query = [(k, v) for k, v in parse_qsl(p.query) if not k.lower().startswith("utm_")]
+    return urlunparse((p.scheme, p.netloc.lower(), p.path.rstrip("/") or "/", "", urlencode(query), ""))
 
+
+def _is_known(db: Session, url: str) -> bool:
+    return db.query(Tender.id).filter(Tender.source_url.in_([url, _normalize_url(url)])).first() is not None
+
+
+def _collect_candidates(db: Session, queries: list[str], per_query: int, time_filter: str | None,
+                        seen: set[str], stats: Counter) -> list[dict]:
+    candidates = []
     for query in queries:
-        for result in search_web(query, num_results=results_per_query):
-            url = result.get("link", "")
+        results = search_web(query, num_results=per_query, time_filter=time_filter, filter_noise=True)
+        stats["serper_queries"] += 1
+        for r in results:
+            url = r.get("link", "")
             if not url:
+                if r.get("title") == "ERROR":
+                    stats["serper_errors"] += 1
                 continue
-            all_created.extend(_process_url(db, url, fallback_snippet=result.get("snippet", "")))
+            norm = _normalize_url(url)
+            if norm in seen:
+                continue
+            seen.add(norm)
+            if _is_known(db, url):
+                stats["already_known"] += 1
+                continue
+            candidates.append({"url": url, "title": r.get("title", ""), "snippet": r.get("snippet", "")})
+    return candidates
 
-    db.commit()
-    for t in all_created:
-        db.refresh(t)
-    return all_created
+
+def _prerank(candidates: list[dict]) -> list[dict]:
+    """Classement bon marché (titre + snippet) pour ne scraper que les URLs prometteuses."""
+    scored = []
+    for c in candidates:
+        blob = f"{c['title']} {c['snippet']}"
+        score = it_relevance_score(blob) * 2
+        score += 3 if content_has_tender_signal(blob) else 0
+        score -= negative_score(blob) * 3
+        if any(d in c["url"] for d in PREFERRED_DOMAINS):
+            score += 3
+        if c["url"].lower().split("?")[0].endswith(".pdf"):
+            score += 1  # les cahiers des charges PDF sont riches en exigences
+        scored.append((score, c))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [c for score, c in scored if score > -3][:MAX_CANDIDATES_TO_SCRAPE]
 
 
-def ingest_from_portals(db: Session) -> list[Tender]:
-    """Crawler dédié sur des portails connus (bonus Multi-Source Crawler)."""
-    created = []
-    for url in discover_links_from_known_portals():
-        created.extend(_process_url(db, url))
+def _ingest_urls(db: Session, urls: list[str], max_tenders: int, stats: Counter) -> list[Tender]:
+    stats["urls_scraped"] += len(urls)
+    texts = scrape_many(urls, SCRAPE_WORKERS)
+
+    accepted: list[tuple[int, str, str]] = []
+    sublinks: list[str] = []
+
+    def evaluate(url: str, text: str):
+        if text.startswith("SCRAPE_ERROR"):
+            stats["scrape_errors"] += 1
+            return
+        ok, reason = assess_tender_candidate(text)
+        if ok:
+            accepted.append((it_relevance_score(text), url, text))
+        else:
+            stats[f"rejected: {reason}"] += 1
+
+    for url in urls:
+        text = texts.get(url, "")
+        if not text.startswith("SCRAPE_ERROR") and looks_like_listing_page(text, url):
+            links = [l for l in discover_tender_links(url) if not _is_known(db, l)]
+            if links:
+                sublinks.extend(links)
+                stats["listing_pages_expanded"] += 1
+                continue
+        evaluate(url, text)
+
+    # 2e vague: détails extraits des pages listing
+    sublinks = [l for l in dict.fromkeys(sublinks) if l not in texts][:MAX_LISTING_SUBLINKS]
+    if sublinks:
+        stats["urls_scraped"] += len(sublinks)
+        for url, text in scrape_many(sublinks, SCRAPE_WORKERS).items():
+            evaluate(url, text)
+
+    accepted.sort(key=lambda x: x[0], reverse=True)
+    created, seen = [], set()
+    for _, url, text in accepted:
+        norm = _normalize_url(url)
+        if norm in seen or _is_known(db, url):
+            continue
+        seen.add(norm)
+        tender = Tender(source="dynamic_search", source_url=norm, raw_text=text[:8000], status="new")
+        db.add(tender)
+        created.append(tender)
+        if len(created) >= max_tenders:
+            break
 
     db.commit()
     for t in created:
         db.refresh(t)
+    stats["tenders_created"] += len(created)
+    return created
+
+
+def ingest_dynamic_tenders(db: Session, max_tenders: int = 15, results_per_query: int = 10,
+                           time_filter: str | None = "qdr:m", queries: list[str] | None = None) -> list[Tender]:
+    global _last_stats
+    stats: Counter = Counter()
+    queries = queries or build_queries(db)
+    seen: set[str] = set()
+
+    candidates = _collect_candidates(db, queries, results_per_query, time_filter, seen, stats)
+    if len(candidates) < 15 and time_filter != "qdr:y":
+        # élargit la fenêtre temporelle si la période courte est trop pauvre
+        candidates += _collect_candidates(db, queries, results_per_query, "qdr:y", seen, stats)
+        stats["time_window_relaxed"] = 1
+
+    # Multi-source: liens issus directement des portails connus
+    for url in discover_links_from_known_portals():
+        norm = _normalize_url(url)
+        if norm not in seen and not _is_known(db, url):
+            seen.add(norm)
+            candidates.append({"url": url, "title": "", "snippet": "tender appel d'offres"})
+            stats["portal_links"] += 1
+
+    stats["candidates_found"] = len(candidates)
+    ranked = _prerank(candidates)
+    stats["candidates_after_prerank"] = len(ranked)
+
+    created = _ingest_urls(db, [c["url"] for c in ranked], max_tenders, stats)
+    _last_stats = {"queries": queries, **dict(stats)}
+    logger.info("Ingestion terminée: %s", _last_stats)
+    return created
+
+
+def ingest_from_portals(db: Session, max_tenders: int = 15) -> list[Tender]:
+    global _last_stats
+    stats: Counter = Counter()
+    urls = [u for u in discover_links_from_known_portals() if not _is_known(db, u)]
+    stats["portal_links"] = len(urls)
+    created = _ingest_urls(db, urls, max_tenders, stats)
+    _last_stats = dict(stats)
     return created
 
 
@@ -110,13 +190,20 @@ def run_extraction(db: Session, tender: Tender) -> Tender:
 
     fields = extract_tender_fields(tender.raw_text)
     tender.title = fields["title"]
-    tender.issuing_organization = fields.get("issuing_organization", "unknown")
+    tender.issuing_organization = fields["issuing_organization"]
     tender.sector = fields["sector"]
     tender.estimated_budget = fields["estimated_budget"]
     tender.deadline = fields["deadline"]
     tender.requirements = fields["requirements"]
     tender.summary = fields["summary"]
-    tender.status = "extracted"
+    tender.data_quality_flags = fields["quality_flags"]
+
+    # Un tender trouvé automatiquement et jugé hors périmètre IT est écarté tôt.
+    # Un tender saisi manuellement est toujours respecté.
+    if tender.source == "dynamic_search" and not fields["is_relevant"]:
+        tender.status = "rejected_irrelevant"
+    else:
+        tender.status = "extracted"
 
     db.commit()
     db.refresh(tender)

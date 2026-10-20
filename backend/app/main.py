@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import tenders, rag
+from app.routers import tenders, rag, proposals, exports
 
-app = FastAPI(title="OliveSoft RFP Intelligence - Phase 1")
+app = FastAPI(title="OliveSoft RFP Intelligence - Phase 1 & 2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,3 +26,5 @@ def health():
 
 app.include_router(tenders.router)
 app.include_router(rag.router)
+app.include_router(proposals.router)
+app.include_router(exports.router)

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.models import Document, DocumentChunk
 from app.services.ollama_client import embed_text
 from app.services.pdf_loader import extract_text_from_pdf, guess_doc_type
+from app.services.doc_metadata_extraction import extract_document_metadata
 
 INTERNAL_DOCS_PATH = Path(__file__).resolve().parents[2] / "data" / "internal_docs"
 
@@ -24,9 +25,11 @@ def chunk_text(text: str, chunk_size: int = 300, overlap: int = 50) -> list[str]
 
 def ingest_document(db: Session, title: str, doc_type: str, content: str) -> Document | None:
     if not content or content.startswith("PDF_EXTRACTION_ERROR"):
-        return None  # edge case: PDF illisible, on ignore proprement sans planter le pipeline
+        return None
 
-    document = Document(title=title, doc_type=doc_type, content=content)
+    metadata = extract_document_metadata(content)
+
+    document = Document(title=title, doc_type=doc_type, content=content, structured_metadata=metadata)
     db.add(document)
     db.flush()
 
@@ -50,7 +53,6 @@ def ingest_document(db: Session, title: str, doc_type: str, content: str) -> Doc
 
 
 def ingest_pdfs_from_folder(db: Session) -> list[str]:
-    """Indexe tous les PDF du dossier data/internal_docs (dédupliqué par titre)."""
     ingested = []
     if not INTERNAL_DOCS_PATH.exists():
         return ingested
@@ -58,7 +60,7 @@ def ingest_pdfs_from_folder(db: Session) -> list[str]:
     for pdf_path in INTERNAL_DOCS_PATH.glob("*.pdf"):
         existing = db.query(Document).filter(Document.title == pdf_path.name).first()
         if existing:
-            continue  # déjà indexé
+            continue
 
         content = extract_text_from_pdf(pdf_path)
         doc_type = guess_doc_type(pdf_path.name)

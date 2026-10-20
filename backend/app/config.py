@@ -11,6 +11,15 @@ class Settings(BaseSettings):
     mcp_server_url: str = "http://127.0.0.1:8100/sse"
     app_env: str = "development"
 
+    # --- Apify (option alternative de détection) ---
+    apify_api_token: str = ""
+    apify_search_actor: str = "apify/google-search-scraper"
+    apify_crawler_actor: str = "apify/website-content-crawler"
+    apify_country_code: str = "tn"
+    apify_language_code: str = "fr"
+    apify_custom_actor_id: str = ""
+    apify_custom_actor_input: str = "{}"
+
     class Config:
         env_file = ".env"
 

@@ -1,0 +1,200 @@
+{
+  "name": "Phase2 - Tender Intelligence Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-704, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/tenders/ingest/dynamic",
+        "options": {}
+      },
+      "id": "detect",
+      "name": "1 - Detect Tenders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-464, 80]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "loop",
+      "name": "2 - Loop Over Tenders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-240, 48]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/extract",
+        "options": {}
+      },
+      "id": "extract",
+      "name": "3 - Extract Fields",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/qualify",
+        "options": {}
+      },
+      "id": "qualify",
+      "name": "4 - Qualify (Matching + Scoring)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [224, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "qualified",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if",
+      "name": "5 - If qualified",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [448, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.id }}/research",
+        "options": {}
+      },
+      "id": "research",
+      "name": "6 - Research Prospect (MCP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [688, -48],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/tenders/{{ $json.tender_id }}/competitor-insights",
+        "options": {}
+      },
+      "id": "competitor",
+      "name": "7 - Competitor Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [912, -48],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/proposals/tenders/{{ $json.tender_id }}/generate",
+        "options": {}
+      },
+      "id": "generate",
+      "name": "8 - Generate Proposal (Crew)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1136, -48],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/exports/proposals/{{ $json.id }}/pptx",
+        "options": {}
+      },
+      "id": "pptx",
+      "name": "9 - Export PPTX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, -96],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:8000/exports/proposals/{{ $json.id }}/pdf",
+        "options": {}
+      },
+      "id": "pdf",
+      "name": "10 - Export PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1584, -96],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "ignored",
+      "name": "Tender ignoré (non qualifié)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [688, 160]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "1 - Detect Tenders", "type": "main", "index": 0 }]]
+    },
+    "1 - Detect Tenders": {
+      "main": [[{ "node": "2 - Loop Over Tenders", "type": "main", "index": 0 }]]
+    },
+    "2 - Loop Over Tenders": {
+      "main": [
+        [],
+        [{ "node": "3 - Extract Fields", "type": "main", "index": 0 }]
+      ]
+    },
+    "3 - Extract Fields": {
+      "main": [[{ "node": "4 - Qualify (Matching + Scoring)", "type": "main", "index": 0 }]]
+    },
+    "4 - Qualify (Matching + Scoring)": {
+      "main": [[{ "node": "5 - If qualified", "type": "main", "index": 0 }]]
+    },
+    "5 - If qualified": {
+      "main": [
+        [{ "node": "6 - Research Prospect (MCP)", "type": "main", "index": 0 }],
+        [{ "node": "Tender ignoré (non qualifié)", "type": "main", "index": 0 }]
+      ]
+    },
+    "6 - Research Prospect (MCP)": {
+      "main": [[{ "node": "7 - Competitor Insights", "type": "main", "index": 0 }]]
+    },
+    "7 - Competitor Insights": {
+      "main": [[{ "node": "8 - Generate Proposal (Crew)", "type": "main", "index": 0 }]]
+    },
+    "8 - Generate Proposal (Crew)": {
+      "main": [[{ "node": "9 - Export PPTX", "type": "main", "index": 0 }]]
+    },
+    "9 - Export PPTX": {
+      "main": [[{ "node": "10 - Export PDF", "type": "main", "index": 0 }]]
+    },
+    "10 - Export PDF": {
+      "main": [[{ "node": "2 - Loop Over Tenders", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "binaryMode": "separate" },
+  "versionId": "phase2-v1"
+}
