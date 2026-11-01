@@ -80,6 +80,14 @@ def list_qualified(db: Session = Depends(get_db)):
         .order_by(Tender.qualification_score.desc()).all()
     )
 
+@router.get("/pending/list", response_model=list[TenderOut])
+def list_pending(db: Session = Depends(get_db)):
+    """Tenders bloqués à une étape intermédiaire, à reprendre sans relancer la détection."""
+    return (
+        db.query(Tender)
+        .filter(Tender.status.in_(["new", "extracted", "qualified", "researched"]))
+        .order_by(Tender.created_at.asc()).all()
+    )
 
 @router.get("/{tender_id}", response_model=TenderOut)
 def get_tender(tender_id: str, db: Session = Depends(get_db)):

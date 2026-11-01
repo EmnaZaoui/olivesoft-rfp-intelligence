@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     mcp_server_url: str = "http://127.0.0.1:8100/sse"
     app_env: str = "development"
 
-    # --- Apify (option alternative de détection) ---
+    # Apify (option alternative de détection)
     apify_api_token: str = ""
     apify_search_actor: str = "apify/google-search-scraper"
     apify_crawler_actor: str = "apify/website-content-crawler"
@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     apify_language_code: str = "fr"
     apify_custom_actor_id: str = ""
     apify_custom_actor_input: str = "{}"
+
+    # Authentification
+    jwt_secret: str = "change-me-in-env"
+    jwt_expire_minutes: int = 720
+
+    # n8n (page Orchestration)
+    n8n_base_url: str = "http://localhost:5678"
+    n8n_api_key: str = ""
 
     class Config:
         env_file = ".env"

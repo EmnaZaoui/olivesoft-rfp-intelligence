@@ -129,3 +129,13 @@ class RagBenchmarkRun(Base):
     recall_at_k = Column(Float, nullable=True)
     mrr = Column(Float, nullable=True)
     details = Column(JSON, nullable=True)
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, default="sales")   # admin | sales
+    created_at = Column(DateTime, default=datetime.utcnow)

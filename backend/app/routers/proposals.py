@@ -39,7 +39,7 @@ def edit_section(draft_id: str, section_key: str, payload: SectionEditRequest, d
     )
     matrix = db.query(RequirementMatch).filter(RequirementMatch.tender_id == tender.id).all()
 
-    sections = draft.content_sections or {}
+    sections = dict(draft.content_sections or {})
     current_content = sections.get(section_key, "")
 
     tender_dict = {
