@@ -26,3 +26,9 @@ STRATEGIC_SECTORS = [
 
 # Nombre maximal d'allers-retour Rédacteur <-> Relecteur dans le Proposal Crew
 MAX_CREW_ITERATIONS = 3
+
+# Fit technique minimal (moyenne des scores d'exigences) pour qu'un tender soit qualifié
+MIN_TECHNICAL_FIT = 35.0
+
+# Part minimale d'exigences couvertes pour autoriser la rédaction d'une proposition
+MIN_COVERAGE_FOR_PROPOSAL = 0.4

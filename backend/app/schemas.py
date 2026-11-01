@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
-
+from datetime import datetime
 
 class TenderCreate(BaseModel):
     source: str
@@ -28,6 +28,8 @@ class TenderOut(BaseModel):
     urgent_deadline_alert: Optional[bool] = None
     qualification_score: Optional[float] = None
     qualification_reasons: Optional[List[str]] = None
+    deadline_date: Optional[datetime] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
