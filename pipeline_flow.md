@@ -177,7 +177,7 @@ Proposal statuses: `approved` (validated by the Reviewer) and `needs_review` (it
 
 ## Flow Diagram
 
-![System Architecture](docs/Tender Proposal Automation Architecture-2026-11-01-224204.png)
+![System Architecture](docs/architecture.png)
 
 ![Pipeline Flow](docs/pipeline_flow.png)
 
